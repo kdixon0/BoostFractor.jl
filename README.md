@@ -13,20 +13,9 @@ examples is available.-->
 
 ## Installation
 
-To install packages just run
+Run
 ```julia
-julia> using Pkg
-julia> pkg"add https://github.com/mppmu/BoostFractor.jl.git"
-```
-If this does not work replace the URL by whatever is shown when you click the green "Clone or Download" button on the top right.
-
-<!--- julia> pkg"add git@github.com:mppmu/BoostFractor.jl.git" -->
-
-You might find it useful to also add other Julia packages, e.g.
-
-```julia
-julia> using Pkg
-julia> pkg"add Plots PyPlot IJulia JLD"
+using Pkg; Pkg.add(url="https://github.com/mppmu/BoostFractor.jl")
 ```
 
 ## Usage
