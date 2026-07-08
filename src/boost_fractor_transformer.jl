@@ -5,7 +5,7 @@
 #
 # Stefan Knirck
 #
-export transformer,calc_propagation_matrices,field2modes,modes2field, Modes, SeedModes
+export transformer,transformer_B,axion_induced_modes,calc_propagation_matrices,field2modes,modes2field, Modes, SeedModes
 
 # Transformation Matrices
 using LinearAlgebra
@@ -419,3 +419,35 @@ function transformer_trace_back(reflected_beam, input_beam,
 
     return fields_regions
 end
+
+function transformer_B(bdry::SetupBoundaries, coords::CoordinateSystem, modes::Modes; f=10.0e9, velocity_x=0, prop=propagator, propagation_matrices::Array{Array{Complex{T},2},1}=Array{Complex{Float64},2}[], diskR=0.15, emit=axion_induced_modes(coords,modes;B=nothing,velocity_x=velocity_x,diskR=diskR,f=f), reflect=nothing) where T<:Real
+    bdry.eps[isnan.(bdry.eps)] .= 1e30
+    #Definitions
+    transmissionfunction_complete = [modes.id modes.zeromatrix ; modes.zeromatrix modes.id ]
+    lambda = wavelength(f)
+
+    axion_beam = Array{Complex{T}}(zeros((modes.M)*(2modes.L+1)))
+
+    Nregions = length(bdry.eps)
+    idx_reg(s) = Nregions-s+1
+    for s in (Nregions-1):-1:1
+        initial = emit[idx_reg(s)]
+        
+        axion_beam .+= axion_contrib(transmissionfunction_complete, sqrt(bdry.eps[idx_reg(s+1)]), sqrt(bdry.eps[idx_reg(s)]), initial, modes)
+        diffprop = (isempty(propagation_matrices) ?
+                        propagation_matrix(bdry.distance[idx_reg(s)], diskR, bdry.eps[idx_reg(s)], bdry.relative_tilt_x[idx_reg(s)], bdry.relative_tilt_y[idx_reg(s)], bdry.relative_surfaces[idx_reg(s),:,:], lambda, coords, modes; prop=prop) :
+                        propagation_matrices[idx_reg(s)])
+
+        # T_s^m = T_{s+1}^m G_s P_s
+        transmissionfunction_complete *= get_boundary_matrix(sqrt(bdry.eps[idx_reg(s)]), sqrt(bdry.eps[idx_reg(s+1)]), diffprop, modes)
+    end
+    boost =  - (transmissionfunction_complete[index(modes,2),index(modes,2)]) \ (axion_beam)
+    if reflect === nothing
+        return boost
+    end
+
+    refl = - transmissionfunction_complete[index(modes,2),index(modes,2)] \
+           ((transmissionfunction_complete[index(modes,2),index(modes,1)]) * (reflect))
+    return boost, refl
+end
+

@@ -112,16 +112,29 @@ end;
 """
 Calculates boostfactor and reflectivity
 """
-function calc_modes(sbdry,coords,modes, frequencies, prop_matrices_set::Array{Array{Complex{T},2},2},reflect;prop=propagator, diskR=0.15) where T<:Real
+function calc_modes(sbdry,coords,modes, frequencies, prop_matrices_set::Array{Array{Complex{T},2},2},reflect;prop=propagator, diskR=0.15,Bfield=nothing,Bfield_idx=nothing) where T<:Real
     n_freq = length(frequencies)
     n_modes = size(prop_matrices_set[1,1])[1]
     EoutModes0 = Array{Complex{T},3}(undef,2,n_modes,n_freq)
-    # Sweep over frequency
-    Threads.@threads for f in 1:n_freq
-        boost, refl = transformer(sbdry,coords,modes; prop=prop,diskR=diskR,f=frequencies[f],propagation_matrices=prop_matrices_set[:,f],reflect=reflect)
-        EoutModes0[1,:,f] =  boost
-        EoutModes0[2,:,f] =  refl
-    end 
+    if Bfield === nothing
+        # Sweep over frequency
+        Threads.@threads for fi in 1:n_freq
+            boost, refl = transformer(sbdry,coords,modes; prop=prop,diskR=diskR,f=frequencies[fi],propagation_matrices=prop_matrices_set[:,fi],reflect=reflect)
+            EoutModes0[1,:,fi] =  boost
+            EoutModes0[2,:,fi] =  refl
+        end 
+    else
+        Threads.@threads for fi in 1:n_freq
+            idxs = isnothing(Bfield_idx) ? eachindex(Bfield) : Bfield_idx
+            ax_modes=Vector{Vector{ComplexF64}}(undef, length(idxs)) #Array{Array{Complex{Float64}}}(undef,length(Bfield_idx))
+            for (i, idx) in pairs(idxs)
+                ax_modes[i] = axion_induced_modes(coords,modes;B=copy(Bfield[idx]),velocity_x=0,diskR=diskR,f=frequencies[fi])
+            end
+            boost, refl = transformer_B(sbdry,coords,modes; prop=prop,diskR=diskR,f=frequencies[fi],propagation_matrices=prop_matrices_set[:,fi],emit=ax_modes,reflect=reflect)
+            EoutModes0[1,:,fi] =  boost
+            EoutModes0[2,:,fi] =  refl
+        end
+    end
     return EoutModes0
 end;
 
